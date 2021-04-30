@@ -1,0 +1,4 @@
+genome: hg38
+conda_env: environment.yml
+tmp_dir: tmp/
+data_info: config/replication_origins_data.csv

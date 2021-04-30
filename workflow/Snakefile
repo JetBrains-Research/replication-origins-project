@@ -23,26 +23,36 @@ SAMPLES_INFO['File'] = SAMPLES_INFO.SRX + '/' + SAMPLES_INFO.SRR + '.fastq'
 
 PEAK_CALLING_RES = ["_peaks.xls", "_peaks.narrowPeak", "_summits.bed"]
 
+onstart:
+    shell(f"mkdir -p {config['tmp_dir']}")
+
+wildcard_constraints:
+    genome="[A-Za-z0-9]+"
+
 rule all:
     input:
         # expand(f"data/reads/{{file}}", file=SAMPLES_INFO.File)
         'qc/multiqc/reads.html',
         'qc/multiqc/bams.html',
-        expand(f"bigwigs/{{sample}}_{config['genome']}.bw", sample=SAMPLES_INFO.Samples),
+        expand(
+            "bigwigs/{sample}_{genome}.bw",
+            sample=SAMPLES_INFO.Samples,
+            genome=config['genome']
+        ),
         # expand(f"callpeak/{{sample}}_{config['genome']}{{ext}}", sample=SAMPLES_INFO.Samples, ext=PEAK_CALLING_RES)
 
 rule get_fastq:
     output:
         "data/reads/{srx}/{accession}.fastq"
     params:
-        tmp_dir = config['tmp_dir']
+        tmp_dir = config['tmp_dir'],
+        out_dir=lambda wildcards, output: os.path.dirname(output[0])
     log:
-        'logs/fastq_dump/{srx}/{accession}.log'
+        'data/reads/{srx}/{accession}.fastq.log'
     threads: 8
-    run:
-        out_dir = os.path.dirname(output[0])
-        shell("parallel-fastq-dump --threads {threads} "
-              f"--outdir {out_dir} --sra-id {{wildcards.accession}}")
+    conda:
+        "envs/bioinf.yaml"
+    shell: "parallel-fastq-dump --threads {threads} --outdir {params.out_dir} --sra-id {wildcards.accession} &> {log}"
 
 rule fastqc:
     input:
@@ -50,9 +60,9 @@ rule fastqc:
     output:
         html='qc/fastqc/{sample}.html',
         zip='qc/fastqc/{sample}_fastqc.zip'
-    params: '--quiet'
     log:
-        'logs/fastqc/{sample}.log'
+        'qc/fastqc/{sample}.html.log'
+    params: '--quiet'
     threads: 8
     wrapper:
         '0.73.0/bio/fastqc'
@@ -63,74 +73,82 @@ rule multiqc:
     output:
         'qc/multiqc/reads.html'
     log:
-        'logs/multiqc/multiqc.log'
+        'qc/multiqc/reads.html.log'
     wrapper:
         '0.73.0/bio/multiqc'
 
 rule download_reference_genome:
     output:
-        f"indexes/{config['genome']}/{config['genome']}.fa.gz"
+        "indexes/{genome}/{genome}.fa.gz"
     shell:
-        f"wget http://hgdownload.soe.ucsc.edu/goldenPath/{config['genome']}/bigZips/{config['genome']}.fa.gz -O {{output}}"
+        "wget http://hgdownload.soe.ucsc.edu/goldenPath/{wildcards.genome}/bigZips/{wildcards.genome}.fa.gz -O {{output}}"
 
 rule unzip_reference_genome:
     input:
-        f"indexes/{config['genome']}/{config['genome']}.fa.gz"
+        "indexes/{genome}/{genome}.fa.gz"
     output:
-        f"indexes/{config['genome']}/{config['genome']}.fa"
+        "indexes/{genome}/{genome}.fa"
     shell:
         "gzip -d -c {input} > {output}"
 
 rule bowtie2_build:
     input:
-        reference=f"indexes/{config['genome']}/{config['genome']}.fa"
+        reference="indexes/{genome}/{genome}.fa"
     output:
         multiext(
-            f"indexes/{config['genome']}/{config['genome']}",
+            "indexes/{genome}/{genome}",
             ".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2",
         ),
+    log:
+        "indexes/{genome}/{genome}.log",
+    params:
+        basename = lambda wildcards, output: output[0].replace(".1.bt2","")
     conda:
         'envs/bowtie2.yaml'
-    log:
-        "logs/bowtie2_build/build.log"
     threads: 8
-    script:
-        'scripts/bowtie2-build.py'
+    shell:
+        "bowtie2-build --threads {threads} {input.reference} {params.basename} &> {log}"
+
+def foo(wildcards):
+    print(wildcards.sample)
+    print(SAMPLES_INFO.loc[wildcards.sample, 'File'])
+    return [f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File'][0]}"],
 
 rule bowtie2_align:
     input:
-        sample=lambda wildcards: [f"data/reads/{SAMPLES_INFO.loc[wildcards, 'File'][0]}"],
+        sample=lambda wildcards: [f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File']}"],
+        # sample=foo
         index_files=multiext(
-            f"indexes/{config['genome']}/{config['genome']}",
+            "indexes/{genome}/{genome}",
             ".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2",
         ),
     output:
-        f"bams/{{sample}}_{config['genome']}.bam"
+        "bams/{sample}_{genome}.bam"
+    log:
+        "bams/{sample}_{genome}.bam.log"
+    params:
+        index="indexes/{genome}/{genome}"
     conda:
         'envs/bowtie2.yaml'
-    log:
-        "logs/bowtie2_align/{sample}.log"
-    params:
-        index=f"indexes/{config['genome']}/{config['genome']}"
     threads: 8
     script:
         'scripts/bowtie2-align.py'
 
 rule multiqc_bowtie2:
     input:
-        expand(f"logs/bowtie2_align/{{sample}}.log", sample=SAMPLES_INFO.Samples)
+        expand("bams/{sample}_{genome}.bam", sample=SAMPLES_INFO.Samples, genome=config['genome'])
     output:
         'qc/multiqc/bams.html'
     log:
-        'logs/multiqc/multiqc_bowtie2.log'
+        'qc/multiqc/bams.html.log'
     wrapper:
         '0.73.0/bio/multiqc'
 
 rule samtools_sort_bam:
     input:
-        f"bams/{{sample}}_{config['genome']}.bam"
+        "bams/{sample}_{genome}.bam"
     output:
-        f"bams/{{sample}}_{config['genome']}.sorted.bam"
+        "bams/{sample}_{genome}.sorted.bam"
     params:
         extra = "-m 4G",
         tmp_dir = config['tmp_dir']
@@ -140,23 +158,24 @@ rule samtools_sort_bam:
         "0.73.0/bio/samtools/sort"
 
 rule samtools_index_bam:
-    input:
-        f"bams/{{sample}}_{config['genome']}.sorted.bam"
-    output:
-        f"bams/{{sample}}_{config['genome']}.sorted.bam.bai"
+    input: "bams/{sample}_{genome}.sorted.bam"
+    output: "bams/{sample}_{genome}.sorted.bam.bai"
+    log: "bams/{sample}_{genome}.sorted.bam.log"
     wrapper:
         "0.73.0/bio/samtools/index"
 
 rule bam_coverage:
     input:
-        bams=f"bams/{{sample}}_{config['genome']}.sorted.bam",
-        bam_indexes=f"bams/{{sample}}_{config['genome']}.sorted.bam.bai"
+        bams="bams/{sample}_{genome}.sorted.bam",
+        bam_indexes="bams/{sample}_{genome}.sorted.bam.bai"
     output:
-        f"bigwigs/{{sample}}_{config['genome']}.bw"
+       "bigwigs/{sample}_{genome}.bw"
+    log:
+       "bigwigs/{sample}_{genome}.bw.log"
     conda:
-        config['conda_env']
+        "envs/bioinf.yaml"
     shell:
-        f"bamCoverage --bam {{input.bams}} -o {{output}}"
+        "bamCoverage --bam {input.bams} -o {output} &> {log}"
 
 # rule callpeak:
 #     input:

@@ -1,0 +1,9 @@
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+ - deeptools=3.5.1
+ - parallel-fastq-dump=0.6.7
+ - wget
+ - gzip

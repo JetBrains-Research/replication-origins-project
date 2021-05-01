@@ -109,15 +109,9 @@ rule bowtie2_build:
     shell:
         "bowtie2-build --threads {threads} {input.reference} {params.basename} &> {log}"
 
-def foo(wildcards):
-    print(wildcards.sample)
-    print(SAMPLES_INFO.loc[wildcards.sample, 'File'])
-    return [f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File'][0]}"],
-
 rule bowtie2_align:
     input:
         sample=lambda wildcards: [f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File']}"],
-        # sample=foo
         index_files=multiext(
             "indexes/{genome}/{genome}",
             ".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2",

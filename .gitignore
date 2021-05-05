@@ -13,7 +13,9 @@ bigwigs
 conda
 data
 indexes
-callpeak
+macs2
+span
+tools
 qc
 tmp
 

@@ -7,7 +7,7 @@ SAMPLES_INFO = pd.read_csv(config['data_info'], sep=';')
 SAMPLES_INFO.Target = SAMPLES_INFO.Target.fillna('')
 SAMPLES_INFO['Samples'] = SAMPLES_INFO.GSM + '_' + SAMPLES_INFO.Cell + '_' + SAMPLES_INFO.Method
 SAMPLES_INFO = SAMPLES_INFO.set_index(['Samples'], drop=False)
-
+SAMPLES_INFO.to_csv()
 SAMPLES_INFO_INDEX = SAMPLES_INFO.index.tolist()
 ind_n = 1
 for i, b in enumerate(SAMPLES_INFO.index.duplicated()):
@@ -19,7 +19,7 @@ for i, b in enumerate(SAMPLES_INFO.index.duplicated()):
 
 SAMPLES_INFO.index = SAMPLES_INFO_INDEX
 
-SAMPLES_INFO['File'] = f'{SAMPLES_INFO.SRX}/{SAMPLES_INFO.SRR}.fastq'
+SAMPLES_INFO['File'] = SAMPLES_INFO.SRX + '/' + SAMPLES_INFO.SRR + '.fastq'
 
 onstart:
     shell(f"mkdir -p {config['tmp_dir']}")

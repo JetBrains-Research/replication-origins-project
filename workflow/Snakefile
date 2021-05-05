@@ -83,7 +83,7 @@ rule download_reference_genome:
     output:
         "indexes/{genome}/{genome}.fa.gz"
     shell:
-        "wget http://hgdownload.soe.ucsc.edu/goldenPath/{wildcards.genome}/bigZips/{wildcards.genome}.fa.gz -O {{output}}"
+        "wget http://hgdownload.soe.ucsc.edu/goldenPath/{wildcards.genome}/bigZips/{wildcards.genome}.fa.gz -O {output}"
 
 rule unzip_reference_genome:
     input:

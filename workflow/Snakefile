@@ -171,19 +171,19 @@ rule bam_coverage:
     shell:
         "bamCoverage --bam {input.bams} -o {output} &> {log}"
 
-# rule callpeak:
-#     input:
-#         treatment=f"bams/{{sample}}_{config['genome']}.sorted.bam",   # required: treatment sample(s)
-#     output:
-#         multiext(f"callpeak/{{sample}}_{config['genome']}",
-#                  "_peaks.xls",   ### required
-#                  ### optional output files
-#                  "_peaks.narrowPeak",
-#                  "_summits.bed"
-#                  )
-#     log:
-#         "logs/macs2/callpeak.{sample}.log"
-#     params:
-#         "-f BAM -g hs --nomodel"
-#     wrapper:
-#         "0.73.0/bio/macs2/callpeak"
+rule callpeak:
+    input:
+        treatment=f"bams/{{sample}}_{config['genome']}.sorted.bam",   # required: treatment sample(s)
+    output:
+        multiext(f"callpeak/{{sample}}_{config['genome']}",
+                 "_peaks.xls",   ### required
+                 ### optional output files
+                 "_peaks.narrowPeak",
+                 "_summits.bed"
+                 )
+    log:
+        "logs/macs2/callpeak.{sample}.log"
+    params:
+        "-f BAM -g hs --nomodel"
+    wrapper:
+        "0.73.0/bio/macs2/callpeak"

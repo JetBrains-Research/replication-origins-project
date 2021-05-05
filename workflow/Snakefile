@@ -33,12 +33,11 @@ rule all:
         'qc/multiqc/reads.html',
         'qc/multiqc/bams.html',
         expand(
-            "bigwigs/{sample}_{genome}.bw",
-            sample=SAMPLES_INFO.Samples,
-            genome=config['genome']
-        ),
-        expand(
-            "macs2/{sample}_{genome}_peaks.narrowPeak",
+            [
+                "bigwigs/{sample}_{genome}.bw",
+                "macs2/{sample}_{genome}_peaks.narrowPeak",
+                #"span/{sample}_{genome}.span"
+            ],
             sample=SAMPLES_INFO.Samples,
             genome=config['genome']
         )
@@ -78,6 +77,12 @@ rule multiqc:
         'qc/multiqc/reads.html.log'
     wrapper:
         '0.73.0/bio/multiqc'
+
+rule download_span:
+    output:
+        "tools/span-0.13.5244.jar"
+    shell:
+        "wget https://download.jetbrains.com/biolabs/span/span-0.13.5244.jar -O {output}"
 
 rule download_reference_genome:
     output:
@@ -189,3 +194,31 @@ rule macs2:
         "-f BAM -g hs --nomodel"
     wrapper:
         "0.73.0/bio/macs2/callpeak"
+
+rule download_chrom_sizes:
+    output: "indexes/{genome}/{genome}.chrom.sizes"
+    log: "indexes/{genome}/{genome}.chrom.sizes.log"
+    # TODO: use ucsc tool, which fetch chrom sizes
+    shell:
+        'wget -O {output} http://hgdownload.cse.ucsc.edu/goldenPath/{wildcards.genome}/bigZips/{wildcards.genome}.chrom.sizes &> {log}'
+
+rule call_peaks_span:
+    input:
+        span=rules.download_span.output,
+        signal="bams/{sample}_{genome}.sorted.bam",
+        chrom_sizes=rules.download_chrom_sizes.output
+    output:
+        #peaks='span/{sample}_{genome}.peak',
+        model='span/{sample}_{genome}.span'
+
+    log: 'span/{sample}_{genome}.log'
+    conda: 'envs/java8.env.yaml'
+    threads: 4
+    params:
+        span_params=config['span_params'],
+    shell:
+         # '--bin {wildcards.bin} --fdr {wildcards.fdr} --gap {wildcards.gap} --peaks {output.peaks}'
+         'java -Xmx8G -jar {input.span} analyze -t {input.signal} --chrom.sizes {input.chrom_sizes} '
+         '--model {output.model} --fragment 0 '
+         '--workdir span --threads {threads} '
+         '{params.span_params} &> {log}'

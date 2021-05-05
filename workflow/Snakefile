@@ -19,9 +19,7 @@ for i, b in enumerate(SAMPLES_INFO.index.duplicated()):
 
 SAMPLES_INFO.index = SAMPLES_INFO_INDEX
 
-SAMPLES_INFO['File'] = SAMPLES_INFO.SRX + '/' + SAMPLES_INFO.SRR + '.fastq'
-
-PEAK_CALLING_RES = ["_peaks.xls", "_peaks.narrowPeak", "_summits.bed"]
+SAMPLES_INFO['File'] = f'{SAMPLES_INFO.SRX}/{SAMPLES_INFO.SRR}.fastq'
 
 onstart:
     shell(f"mkdir -p {config['tmp_dir']}")
@@ -39,7 +37,11 @@ rule all:
             sample=SAMPLES_INFO.Samples,
             genome=config['genome']
         ),
-        # expand(f"callpeak/{{sample}}_{config['genome']}{{ext}}", sample=SAMPLES_INFO.Samples, ext=PEAK_CALLING_RES)
+        expand(
+            "callpeak/{sample}_{genome}_peaks.narrowPeak",
+            sample=SAMPLES_INFO.Samples,
+            genome=config['genome']
+        )
 
 rule get_fastq:
     output:

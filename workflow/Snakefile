@@ -38,7 +38,7 @@ rule all:
             genome=config['genome']
         ),
         expand(
-            "callpeak/{sample}_{genome}_peaks.narrowPeak",
+            "macs2/{sample}_{genome}_peaks.narrowPeak",
             sample=SAMPLES_INFO.Samples,
             genome=config['genome']
         )
@@ -173,18 +173,18 @@ rule bam_coverage:
     shell:
         "bamCoverage --bam {input.bams} -o {output} &> {log}"
 
-rule callpeak:
+rule macs2:
     input:
         treatment="bams/{sample}_{genome}.sorted.bam",   # required: treatment sample(s)
     output:
-        multiext("callpeak/{sample}_{genome}",
+        multiext("macs2/{sample}_{genome}",
                  "_peaks.xls",   ### required
                  ### optional output files
                  "_peaks.narrowPeak",
                  "_summits.bed"
                  )
     log:
-        "callpeak/{sample}_{genome}.log"
+        "macs2/{sample}_{genome}.log"
     params:
         "-f BAM -g hs --nomodel"
     wrapper:

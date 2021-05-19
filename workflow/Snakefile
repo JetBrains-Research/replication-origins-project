@@ -19,13 +19,15 @@ for i, b in enumerate(SAMPLES_INFO.index.duplicated()):
 
 SAMPLES_INFO.index = SAMPLES_INFO_INDEX
 
-SAMPLES_INFO['File'] = SAMPLES_INFO.SRX + '/' + SAMPLES_INFO.SRR + '.fastq'
+SAMPLES_INFO['FilePref'] = SAMPLES_INFO.SRX + '/' + SAMPLES_INFO.SRR
+SAMPLES_INFO['File'] = SAMPLES_INFO['FilePref'] + '.fastq'
 
 onstart:
     shell(f"mkdir -p {config['tmp_dir']}")
 
 wildcard_constraints:
-    genome="[A-Za-z0-9]+"
+    genome="[A-Za-z0-9]+",
+    accession="[A-Za-z0-9]+"
 
 rule all:
     input:
@@ -55,22 +57,83 @@ rule get_fastq:
         "envs/bioinf.yaml"
     shell: "parallel-fastq-dump --threads {threads} --outdir {params.out_dir} --sra-id {wildcards.accession} --split-files &> {log}"
 
+rule get_fastq_paired:
+    output:
+        "data/reads/{srx}/{accession, [A-Za-z0-9]+}_1.fastq",
+        "data/reads/{srx}/{accession, [A-Za-z0-9]+}_2.fastq",
+    params:
+        tmp_dir = config['tmp_dir'],
+        out_dir=lambda wildcards, output: os.path.dirname(output[0])
+    log:
+        'data/reads/{srx}/{accession, [A-Za-z0-9]+}_1.fastq.log',
+        'data/reads/{srx}/{accession, [A-Za-z0-9]+}_2.fastq.log'
+    threads: 8
+    conda:
+        "envs/bioinf.yaml"
+    shell: "parallel-fastq-dump --threads {threads} --outdir {params.out_dir} --sra-id {wildcards.accession} --split-files &> {log}"
+
+def test(wildcards):
+    print(SAMPLES_INFO)
+    print(SAMPLES_INFO.loc[wildcards.sample, 'File'])
+    print(SAMPLES_INFO.loc[wildcards.sample, 'File'][0])
+    print(f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File'][0]}")
+    return f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File'][0]}"
+
 rule fastqc:
     input:
-        lambda wildcards: f"data/reads/{SAMPLES_INFO.loc[wildcards, 'File'][0]}"
+        lambda wildcards: f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File']}"
+        # test
     output:
-        html='qc/fastqc/{sample}.html',
-        zip='qc/fastqc/{sample}_fastqc.zip'
+        html='qc/fastqc/{sample, .*(?<![12])}.html',
+        zip='qc/fastqc/{sample, .*(?<![12])}_fastqc.zip'
     log:
-        'qc/fastqc/{sample}.html.log'
+        'qc/fastqc/{sample, .*(?<![12])}.html.log'
     params: '--quiet'
     threads: 8
     wrapper:
         '0.73.0/bio/fastqc'
 
+rule fastqc_1:
+    input:
+        lambda wildcards: f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'FilePref']}_1.fastq"
+    output:
+        html='qc/fastqc/{sample}_1.html',
+        zip='qc/fastqc/{sample}_1_fastqc.zip'
+    log:
+        'qc/fastqc/{sample}_1.html.log'
+    params: '--quiet'
+    threads: 8
+    wrapper:
+        '0.73.0/bio/fastqc'
+
+rule fastqc_2:
+    input:
+        lambda wildcards: f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'FilePref']}_2.fastq"
+    output:
+        html='qc/fastqc/{sample}_2.html',
+        zip='qc/fastqc/{sample}_2_fastqc.zip'
+    log:
+        'qc/fastqc/{sample}_2.html.log'
+    params: '--quiet'
+    threads: 8
+    wrapper:
+        '0.73.0/bio/fastqc'
+
+def multiqc_input(wildcards):
+    input = []
+    path_w = 'qc/fastqc/{sample}{pair}_fastqc.zip'
+    for idx, row in SAMPLES_INFO.iterrows():
+        if row.Pair == 1:
+            input.append(path_w.format(sample=row.Samples, pair='_1'))
+            input.append(path_w.format(sample=row.Samples, pair='_2'))
+        else:
+            input.append(path_w.format(sample=row.Samples, pair=''))
+    return input
+
 rule multiqc:
     input:
-        expand('qc/fastqc/{sample}_fastqc.zip', sample=SAMPLES_INFO.Samples)
+        # expand('qc/fastqc/{sample}_fastqc.zip', sample=SAMPLES_INFO.Samples)
+        multiqc_input
     output:
         'qc/multiqc/reads.html'
     log:
@@ -116,9 +179,19 @@ rule bowtie2_build:
     shell:
         "bowtie2-build --threads {threads} {input.reference} {params.basename} &> {log}"
 
+def bowtie2_align_sample(wildcards):
+    if SAMPLES_INFO.loc[wildcards.sample, 'Pair'] == 1:
+        pref, suf = f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File']}".rsplit('.', 1)
+        pref1 = pref + '_1.' + suf
+        pref2 = pref + '_2.' + suf
+        return [pref1, pref2]
+    else:
+        return [f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File']}"]
+
 rule bowtie2_align:
     input:
-        sample=lambda wildcards: [f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File']}"],
+        # sample=lambda wildcards: [f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File']}"],
+        sample = bowtie2_align_sample,
         index_files=multiext(
             "indexes/{genome}/{genome}",
             ".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2",

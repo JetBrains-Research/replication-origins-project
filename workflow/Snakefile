@@ -53,7 +53,7 @@ rule get_fastq:
     threads: 8
     conda:
         "envs/bioinf.yaml"
-    shell: "parallel-fastq-dump --threads {threads} --outdir {params.out_dir} --sra-id {wildcards.accession} &> {log}"
+    shell: "parallel-fastq-dump --threads {threads} --outdir {params.out_dir} --sra-id {wildcards.accession} --split-files &> {log}"
 
 rule fastqc:
     input:

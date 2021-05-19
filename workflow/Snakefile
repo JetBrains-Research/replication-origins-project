@@ -65,24 +65,17 @@ rule get_fastq_paired:
         tmp_dir = config['tmp_dir'],
         out_dir=lambda wildcards, output: os.path.dirname(output[0])
     log:
-        'data/reads/{srx}/{accession, [A-Za-z0-9]+}_1.fastq.log',
-        'data/reads/{srx}/{accession, [A-Za-z0-9]+}_2.fastq.log'
+        'data/reads/{srx}/{accession}.fastq.log'
+        # 'data/reads/{srx}/{accession, [A-Za-z0-9]+}_1.fastq.log',
+        # 'data/reads/{srx}/{accession, [A-Za-z0-9]+}_2.fastq.log'
     threads: 8
     conda:
         "envs/bioinf.yaml"
     shell: "parallel-fastq-dump --threads {threads} --outdir {params.out_dir} --sra-id {wildcards.accession} --split-files &> {log}"
 
-def test(wildcards):
-    print(SAMPLES_INFO)
-    print(SAMPLES_INFO.loc[wildcards.sample, 'File'])
-    print(SAMPLES_INFO.loc[wildcards.sample, 'File'][0])
-    print(f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File'][0]}")
-    return f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File'][0]}"
-
 rule fastqc:
     input:
         lambda wildcards: f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File']}"
-        # test
     output:
         html='qc/fastqc/{sample, .*(?<![12])}.html',
         zip='qc/fastqc/{sample, .*(?<![12])}_fastqc.zip'

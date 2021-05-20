@@ -215,7 +215,11 @@ rule samtools_merge:
 
 rule multiqc_bowtie2:
     input:
-        expand("bams_merge/{sample}_{genome}.bam", sample=SAMPLES_INFO.SamplesNoRepeat, genome=config['genome'])
+        expand(
+            rules.bowtie2_align.log,
+            sample=SAMPLES_INFO.Samples,
+            genome=config['genome']
+        )
     output:
         'qc/multiqc/bams.html'
     log:

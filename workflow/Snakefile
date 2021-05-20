@@ -114,19 +114,17 @@ rule fastqc_2:
         '0.73.0/bio/fastqc'
 
 def multiqc_input(wildcards):
-    input = []
-    path_w = 'qc/fastqc/{sample}{pair}_fastqc.zip'
+    paths = []
     for idx, row in SAMPLES_INFO.iterrows():
-        if row.Pair == 1:
-            input.append(path_w.format(sample=row.Samples, pair='_1'))
-            input.append(path_w.format(sample=row.Samples, pair='_2'))
-        else:
-            input.append(path_w.format(sample=row.Samples, pair=''))
-    return input
+        paths.extend(expand(
+            'qc/fastqc/{sample}{suffix}_fastqc.zip',
+            sample=row.Samples,
+            suffix=['_1', '_2'] if row.Pair == 1 else ''
+        ))
+    return paths
 
 rule multiqc:
     input:
-        # expand('qc/fastqc/{sample}_fastqc.zip', sample=SAMPLES_INFO.Samples)
         multiqc_input
     output:
         'qc/multiqc/reads.html'
@@ -184,7 +182,6 @@ def bowtie2_align_sample(wildcards):
 
 rule bowtie2_align:
     input:
-        # sample=lambda wildcards: [f"data/reads/{SAMPLES_INFO.loc[wildcards.sample, 'File']}"],
         sample = bowtie2_align_sample,
         index_files=multiext(
             "indexes/{genome}/{genome}",
@@ -203,8 +200,10 @@ rule bowtie2_align:
         'scripts/bowtie2-align.py'
 
 def samtools_merge_input(wildcards):
-    input = ["bams/" + s + f"_{wildcards.genome}.bam" for s in SAMPLES_INFO[SAMPLES_INFO.SamplesNoRepeat == wildcards.sample].Samples.tolist()]
-    return input
+    return [
+        "bams/" + s + f"_{wildcards.genome}.bam"
+        for s in SAMPLES_INFO[SAMPLES_INFO.SamplesNoRepeat == wildcards.sample].Samples.tolist()
+    ]
 
 rule samtools_merge:
     input:

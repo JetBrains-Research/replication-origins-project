@@ -69,8 +69,6 @@ rule get_fastq_paired:
         out_dir=lambda wildcards, output: os.path.dirname(output[0])
     log:
         'data/reads/{srx}/{accession}.fastq.log'
-        # 'data/reads/{srx}/{accession}_1.fastq.log',
-        # 'data/reads/{srx}/{accession}_2.fastq.log'
     threads: 8
     conda:
         "envs/bioinf.yaml"

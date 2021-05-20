@@ -30,6 +30,7 @@ onstart:
 
 wildcard_constraints:
     genome="[A-Za-z0-9]+",
+    accession="[A-Za-z0-9]+"
 
 rule all:
     input:
@@ -48,12 +49,12 @@ rule all:
 
 rule get_fastq:
     output:
-        "data/reads/{srx}/{accession, [A-Za-z0-9]+}.fastq"
+        "data/reads/{srx}/{accession}.fastq"
     params:
         tmp_dir = config['tmp_dir'],
         out_dir=lambda wildcards, output: os.path.dirname(output[0])
     log:
-        'data/reads/{srx}/{accession, [A-Za-z0-9]+}.fastq.log'
+        'data/reads/{srx}/{accession}.fastq.log'
     threads: 8
     conda:
         "envs/bioinf.yaml"
@@ -61,15 +62,15 @@ rule get_fastq:
 
 rule get_fastq_paired:
     output:
-        "data/reads/{srx}/{accession, [A-Za-z0-9]+}_1.fastq",
-        "data/reads/{srx}/{accession, [A-Za-z0-9]+}_2.fastq",
+        "data/reads/{srx}/{accession}_1.fastq",
+        "data/reads/{srx}/{accession}_2.fastq",
     params:
         tmp_dir = config['tmp_dir'],
         out_dir=lambda wildcards, output: os.path.dirname(output[0])
     log:
-        'data/reads/{srx}/{accession, [A-Za-z0-9]+}.fastq.log'
-        # 'data/reads/{srx}/{accession, [A-Za-z0-9]+}_1.fastq.log',
-        # 'data/reads/{srx}/{accession, [A-Za-z0-9]+}_2.fastq.log'
+        'data/reads/{srx}/{accession}.fastq.log'
+        # 'data/reads/{srx}/{accession}_1.fastq.log',
+        # 'data/reads/{srx}/{accession}_2.fastq.log'
     threads: 8
     conda:
         "envs/bioinf.yaml"

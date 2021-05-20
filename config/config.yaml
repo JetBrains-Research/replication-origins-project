@@ -1,4 +1,4 @@
 genome: hg38
 tmp_dir: tmp/
-data_info: config/replication_origins_data_test.csv
+data_info: config/replication_origins_data.csv
 span_params: ""

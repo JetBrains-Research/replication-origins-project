@@ -12,7 +12,7 @@ SAMPLES_INFO_INDEX = SAMPLES_INFO.index.tolist()
 ind_n = 1
 for i, b in enumerate(SAMPLES_INFO.index.duplicated()):
     if b:
-        SAMPLES_INFO_INDEX[i] += '_' + str(ind_n)
+        SAMPLES_INFO_INDEX[i] += '_' + str(ind_n) + 's'
         ind_n += 1
     else:
         ind_n = 1

@@ -6,19 +6,21 @@ configfile: 'config/config.yaml'
 SAMPLES_INFO = pd.read_csv(config['data_info'], sep=';')
 SAMPLES_INFO.Target = SAMPLES_INFO.Target.fillna('')
 SAMPLES_INFO['Samples'] = SAMPLES_INFO.GSM + '_' + SAMPLES_INFO.Cell + '_' + SAMPLES_INFO.Method
-SAMPLES_INFO = SAMPLES_INFO.set_index(['Samples'], drop=False)
+SAMPLES_INFO = SAMPLES_INFO.set_index(['Samples'])
 SAMPLES_INFO.to_csv()
 SAMPLES_INFO_INDEX = SAMPLES_INFO.index.tolist()
-ind_n = 1
+ind_n = 2
 for i, b in enumerate(SAMPLES_INFO.index.duplicated()):
     if b:
         SAMPLES_INFO_INDEX[i] += '_' + str(ind_n) + 's'
         ind_n += 1
     else:
-        ind_n = 1
+        SAMPLES_INFO_INDEX[i] += '_' + str(1) + 's'
+        ind_n = 2
 
-SAMPLES_INFO.index = SAMPLES_INFO_INDEX
 SAMPLES_INFO['Samples'] = SAMPLES_INFO_INDEX
+SAMPLES_INFO['SamplesNoRepeat'] = SAMPLES_INFO.index.tolist()
+SAMPLES_INFO.index = SAMPLES_INFO_INDEX
 
 SAMPLES_INFO['FilePref'] = SAMPLES_INFO.SRX + '/' + SAMPLES_INFO.SRR
 SAMPLES_INFO['File'] = SAMPLES_INFO['FilePref'] + '.fastq'
@@ -40,7 +42,7 @@ rule all:
                 "macs2/{sample}_{genome}_peaks.narrowPeak",
                 #"span/{sample}_{genome}.span"
             ],
-            sample=SAMPLES_INFO.Samples,
+            sample=SAMPLES_INFO.SamplesNoRepeat,
             genome=config['genome']
         )
 
@@ -201,9 +203,23 @@ rule bowtie2_align:
     script:
         'scripts/bowtie2-align.py'
 
+def samtools_merge_input(wildcards):
+    input = ["bams/" + s + f"_{wildcards.genome}.bam" for s in SAMPLES_INFO[SAMPLES_INFO.SamplesNoRepeat == wildcards.sample].Samples.tolist()]
+    return input
+
+rule samtools_merge:
+    input:
+        samtools_merge_input
+    output:
+        "bams_merge/{sample}_{genome}.bam"
+    threads:  # Samtools takes additional threads through its option -@
+        8     # This value - 1 will be sent to -@
+    wrapper:
+        "0.74.0/bio/samtools/merge"
+
 rule multiqc_bowtie2:
     input:
-        expand("bams/{sample}_{genome}.bam", sample=SAMPLES_INFO.Samples, genome=config['genome'])
+        expand("bams_merge/{sample}_{genome}.bam", sample=SAMPLES_INFO.SamplesNoRepeat, genome=config['genome'])
     output:
         'qc/multiqc/bams.html'
     log:
@@ -213,9 +229,9 @@ rule multiqc_bowtie2:
 
 rule samtools_sort_bam:
     input:
-        "bams/{sample}_{genome}.bam"
+        "bams_merge/{sample}_{genome}.bam"
     output:
-        "bams/{sample}_{genome}.sorted.bam"
+        "bams_merge/{sample}_{genome}.sorted.bam"
     params:
         extra = "-m 4G",
         tmp_dir = config['tmp_dir']
@@ -225,16 +241,16 @@ rule samtools_sort_bam:
         "0.73.0/bio/samtools/sort"
 
 rule samtools_index_bam:
-    input: "bams/{sample}_{genome}.sorted.bam"
-    output: "bams/{sample}_{genome}.sorted.bam.bai"
-    log: "bams/{sample}_{genome}.sorted.bam.log"
+    input: "bams_merge/{sample}_{genome}.sorted.bam"
+    output: "bams_merge/{sample}_{genome}.sorted.bam.bai"
+    log: "bams_merge/{sample}_{genome}.sorted.bam.log"
     wrapper:
         "0.73.0/bio/samtools/index"
 
 rule bam_coverage:
     input:
-        bams="bams/{sample}_{genome}.sorted.bam",
-        bam_indexes="bams/{sample}_{genome}.sorted.bam.bai"
+        bams="bams_merge/{sample}_{genome}.sorted.bam",
+        bam_indexes="bams_merge/{sample}_{genome}.sorted.bam.bai"
     output:
        "bigwigs/{sample}_{genome}.bw"
     log:
@@ -246,7 +262,7 @@ rule bam_coverage:
 
 rule macs2:
     input:
-        treatment="bams/{sample}_{genome}.sorted.bam",   # required: treatment sample(s)
+        treatment="bams_merge/{sample}_{genome}.sorted.bam",   # required: treatment sample(s)
     output:
         multiext("macs2/{sample}_{genome}",
                  "_peaks.xls",   ### required

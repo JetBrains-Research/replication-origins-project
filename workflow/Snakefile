@@ -47,32 +47,30 @@ rule all:
             genome=config['genome']
         )
 
-rule get_fastq:
+rule get_fastq_se:
     output:
         "data/reads/{srx}/{accession}.fastq"
-    params:
-        tmp_dir = config['tmp_dir'],
-        out_dir=lambda wildcards, output: os.path.dirname(output[0])
     log:
         'data/reads/{srx}/{accession}.fastq.log'
+    params:
+        extra=""
     threads: 8
-    conda:
-        "envs/bioinf.yaml"
-    shell: "parallel-fastq-dump --threads {threads} --outdir {params.out_dir} --sra-id {wildcards.accession} &> {log}"
+    wrapper:
+        "0.74.0/bio/sra-tools/fasterq-dump"
 
-rule get_fastq_paired:
+rule get_fastq_pe:
     output:
+        # the wildcard name must be accession, pointing to an SRA number
         "data/reads/{srx}/{accession}_1.fastq",
         "data/reads/{srx}/{accession}_2.fastq",
-    params:
-        tmp_dir = config['tmp_dir'],
-        out_dir=lambda wildcards, output: os.path.dirname(output[0])
     log:
         'data/reads/{srx}/{accession}.fastq.log'
+    params:
+        # optional extra arguments
+        extra=""
     threads: 8
-    conda:
-        "envs/bioinf.yaml"
-    shell: "parallel-fastq-dump --threads {threads} --outdir {params.out_dir} --sra-id {wildcards.accession} --split-files &> {log}"
+    wrapper:
+        "0.74.0/bio/sra-tools/fasterq-dump"
 
 rule fastqc:
     input:

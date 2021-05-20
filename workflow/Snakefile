@@ -18,6 +18,7 @@ for i, b in enumerate(SAMPLES_INFO.index.duplicated()):
         ind_n = 1
 
 SAMPLES_INFO.index = SAMPLES_INFO_INDEX
+SAMPLES_INFO['Samples'] = SAMPLES_INFO_INDEX
 
 SAMPLES_INFO['FilePref'] = SAMPLES_INFO.SRX + '/' + SAMPLES_INFO.SRR
 SAMPLES_INFO['File'] = SAMPLES_INFO['FilePref'] + '.fastq'

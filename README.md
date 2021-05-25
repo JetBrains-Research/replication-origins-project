@@ -30,3 +30,18 @@ Run pipeline
 conda activate "$(pwd)/.conda_env"
 snakemake -pr --use-conda --cores 6
 ```
+Get bigwigs:
+```shell
+find bigwigs \( -name "*.bw" -or -name "*.log" \)  | xargs tar -zcvf bigwigs.tar.gz
+```
+
+Get peaks:
+```shell
+find macs2 \( -name "*.narrowPeak" -or -name "*.log" \)  | xargs tar -zcvf peaks.tar.gz
+```
+
+Plot DAG and rule graphs
+```shell
+snakemake --dag | dot -Tsvg > images/dag.svg
+snakemake --rulegraph | dot -Tsvg > images/rulegraph.svg
+```
